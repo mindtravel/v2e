@@ -25,6 +25,7 @@ from v2ecore.emulator_utils import subtract_leak_current
 from v2ecore.output.ae_text_output import DVSTextOutput
 from v2ecore.output.aedat2_output import AEDat2Output
 from v2ecore.output.aedat4_output import AEDat4Output
+from v2ecore.output.npz_by_frame_output import NpzOutput
 from v2ecore.v2e_utils import checkAddSuffix, v2e_quit, video_writer
 
 # import rosbag # not yet for python 3
@@ -101,6 +102,7 @@ class EventEmulator(object):
             dvs_aedat2: str = None,
             dvs_aedat4: str = None,
             dvs_text: str = None,
+            dvs_npz: str = None,
             # change as you like to see 'baseLogFrame',
             # 'lpLogFrame', 'diff_frame'
             show_dvs_model_state: str = None,
@@ -113,7 +115,8 @@ class EventEmulator(object):
             hdr: bool = False,
             scidvs: bool = False,
             record_single_pixel_states=None,
-            label_signal_noise=False
+            label_signal_noise=False,
+            slowdown_factor: int = 1,
     ):
         """
         Parameters
@@ -235,6 +238,7 @@ class EventEmulator(object):
         self.dvs_aedat2 = dvs_aedat2
         self.dvs_aedat4 = dvs_aedat4
         self.dvs_text = dvs_text
+        self.dvs_npz = dvs_npz
 
         # event stats
         self.num_events_total = 0
@@ -345,7 +349,15 @@ class EventEmulator(object):
                 logger.info('opening text DVS output file ' + path)
                 self.dvs_text = DVSTextOutput(path,label_signal_noise=self.label_signal_noise)
 
-
+            if dvs_npz:
+                if label_signal_noise:
+                    raise ValueError("set label_signal_noise but we can't output it as npz")
+                npz_folder_path = os.path.join(self.output_folder, "events_npz")
+                if not os.path.exists(npz_folder_path):
+                    os.makedirs(npz_folder_path)
+                logger.info('opening npz DVS output file ' + npz_folder_path)
+                self.dvs_npz = NpzOutput(npz_folder_path)               
+                
 
         except Exception as e:
             logger.error(f'Output file exception "{e}" (maybe you need to specify a supported DVS camera type?)')
@@ -368,7 +380,7 @@ class EventEmulator(object):
             self.show_dvs_model_state = EventEmulator.MODEL_STATES.keys()
 
         self.show_norms = {}  # dict of named tuples (min,max) for each displayed model state that adapts to fit displayed values into 0-1 range for rendering
-
+        self.slowdown_factor = slowdown_factor
         atexit.register(self.cleanup)
 
     def prepare_storage(self, n_frames, frame_ts):
@@ -941,7 +953,7 @@ class EventEmulator(object):
             self.base_log_frame[shot_on_xy]=self.lp_log_frame[shot_on_xy]
             self.base_log_frame[shot_off_xy]=self.lp_log_frame[shot_off_xy]
 
-
+        # print("dvs_npz:", self.dvs_npz)
         if len(events) > 0:
             events = events.cpu().data.numpy() # # ndarray shape (N,4) where N is the number of events are rows are [t,x,y,p]
             timestamps=events[:,0]
@@ -975,6 +987,15 @@ class EventEmulator(object):
                     self.dvs_text.appendEvents(events, signnoise_label=signnoise_label)
                 else:
                     self.dvs_text.appendEvents(events)
+            
+            if self.dvs_npz is not None:
+                if (self.frame_counter - 1) % self.slowdown_factor == 0:
+                # print("save:", self.frame_counter - 1)
+                    self.dvs_npz.savezEvents((self.frame_counter - 1) // self.slowdown_factor)
+                self.dvs_npz.appendEvents(events)
+                
+                # save events to npz file
+                # np.savez(self.dvs_npz, events=events, signnoise_label=signnoise_label)
 
         if self.frame_ev_idx_dataset is not None:
             # save frame event idx
@@ -1168,7 +1189,7 @@ if __name__ == "__main__":
             print("-" * 50)
 
             # # emulate events
-            new_events = emulator.generate_events(luma_frame, current_time)
+            new_events = emulator.generate_events(luma_frame, current_time, idx)
 
             # update time
             current_time += delta_t

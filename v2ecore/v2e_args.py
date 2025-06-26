@@ -411,6 +411,20 @@ def v2e_args(parser):
         "--dvs_text", type=output_file_check, default=None,
         help="Output DVS events as text file with one event per "
              "line [timestamp (float s), x, y, polarity (0,1)]. ")
+    dvsEventOutputGroup.add_argument(
+        "--dvs_npz", type=output_file_check, default=None,
+        help="将事件流的每一帧存储成一个npz文件，存储在output_folder/events_npz中，命名为{:6d}.npz"
+             "line [timestamp (float s), x, y, polarity (0,1)]. "
+                """Save events to ".npy" file.
+
+                In the "events" array columns correspond to: x, y, timestamp, polarity.
+
+                We store:
+                (1) x,y coordinates with uint16 precision.
+                (2) timestamp with float32 precision.
+                (3) polarity with binary precision, by converting it to {0,1} representation.
+
+                """)
     dvsEventOutputGroup.add_argument('--label_signal_noise', action='store_true',
                                  help='append to the --dvs_text file a column,'
                                       'containing list of signal and shot noise events. '

@@ -30,14 +30,20 @@ def run_cmd(cmd_args):
 
     except Exception as e:
         print(f"⚠️ 未知错误: {str(e)}")
+        
+import shutil
 
 def run_v2e(input_root_folder, filename):
     output_dir = os.path.join(output_folder, filename)
     input_dir = os.path.join(input_root_folder, filename)
     if not os.path.exists(output_dir):
         os.mkdir(output_dir)
+    # if os.path.exists(os.path.join(output_dir, "events_npz")): # 删除生成的npz文件，没有生成错误就不要轻易用
+    #     shutil.rmtree(os.path.join(output_dir, "events_npz"))   
+    #     print(os.path.join(output_dir, "events_npz"))
     if dvs_exposure == "duration":
-        arg1 = 0.005
+        # arg1 = 0.005
+        arg1 = 1 / 30 # avi视频帧率是正常速度
     elif dvs_exposure == "count":
         arg1 = 5000
     cmd_args = [
@@ -51,11 +57,13 @@ def run_v2e(input_root_folder, filename):
         "--pos_thres=0.15",
         "--neg_thres=0.15",
         "--sigma_thres=0.03",
-        "--dvs_text", name,
+        # "--dvs_text", name,
+        "--dvs_npz=True",
         "--output_width=" + str(width),
         "--output_height=" + str(height),
-        # "--stop_time=3",
+        # "--stop_time=1", # for test
         "--cutoff_hz=15",
+        "--skip_video_output",
         "--no_preview"
     ]
     run_cmd(cmd_args)
@@ -77,13 +85,12 @@ def run_avi_2_mp4(filename):
     ]
     run_cmd(cmd_args)
 
-    
-
-
 if __name__ == "__main__":
     for video_name in os.listdir(input_root_folder):
         print("try video_name:", video_name)
         run_v2e(input_root_folder, video_name)
         run_avi_2_mp4(video_name)
+        # break
         
+     
      

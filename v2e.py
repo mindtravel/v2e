@@ -14,12 +14,15 @@ import argparse
 import importlib
 import sys
 
+
 import argcomplete
 import cv2
 import numpy as np
+
 import os
 from tempfile import TemporaryDirectory
 from engineering_notation import EngNumber as eng  # only from pip
+
 from tqdm import tqdm
 
 import torch
@@ -305,8 +308,12 @@ def main():
     dvs_aedat2 = args.dvs_aedat2
     dvs_aedat4 = args.dvs_aedat4
     dvs_text = args.dvs_text
+    dvs_npz = args.dvs_npz
     # signal noise output CSV file
     label_signal_noise=args.label_signal_noise
+    if label_signal_noise and dvs_npz is not None:
+        logger.error('if you specify --label_signal_noise you must specify --dvs_text and/or --dvs_aedat2 and/or --dvs_aedat4')
+        v2e_quit(1)
     if label_signal_noise and dvs_text is None and dvs_aedat2 is None and dvs_aedat4 is None:
         logger.error('if you specify --label_signal_noise you must specify --dvs_text and/or --dvs_aedat2 and/or --dvs_aedat4')
         v2e_quit(1)
@@ -550,7 +557,7 @@ def main():
         noise_rate_cov_decades=args.noise_rate_cov_decades,
         refractory_period_s=args.refractory_period,
         seed=args.dvs_emulator_seed,
-        output_folder=output_folder, dvs_h5=dvs_h5, dvs_aedat2=dvs_aedat2, dvs_aedat4 = dvs_aedat4,
+        output_folder=output_folder, dvs_h5=dvs_h5, dvs_aedat2=dvs_aedat2, dvs_aedat4 = dvs_aedat4, dvs_npz=dvs_npz,
         dvs_text=dvs_text, show_dvs_model_state=args.show_dvs_model_state,
         save_dvs_model_state=args.save_dvs_model_state,
         output_width=output_width, output_height=output_height,
@@ -559,7 +566,8 @@ def main():
         hdr=hdr,
         scidvs=scidvs,
         record_single_pixel_states=record_single_pixel_states,
-        label_signal_noise=label_signal_noise
+        label_signal_noise=label_signal_noise,
+        slowdown_factor = slowdown_factor,
     )
 
     if args.dvs_params is not None:
@@ -768,7 +776,7 @@ def main():
                     # read back to memory
                     interpFramesFilenames = all_images(interpFramesFolder)
                     # number of frames
-                    n = len(interpFramesFilenames)
+                    # n = len(interpFramesFilenames)
                 else:
                     logger.info(
                         f'*** Stage 2/3:turning npy frame files to png '
@@ -832,7 +840,6 @@ def main():
                             fr = read_image(interpFramesFilenames[i])
                             newEvents = emulator.generate_events(
                                 fr, interpTimes[i])
-
                             pbar.update(1)
                             if newEvents is not None and \
                                     newEvents.shape[0] > 0 \
